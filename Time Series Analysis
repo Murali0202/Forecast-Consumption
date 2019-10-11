@@ -1,0 +1,118 @@
+import os
+
+import pandas as pd
+import seaborn as sns
+from matplotlib import pyplot as plt
+from pandas.plotting import autocorrelation_plot
+import time_series_analysis_model as tsa_m
+
+
+class TimeSeriesAnalysisDataProcess:
+    def __init__(self, dataset):
+        self._dataset = dataset
+        self._house_hold_names = []
+        self._top_1_data = pd.DataFrame()
+        self._top_2_data = pd.DataFrame()
+        self._top_3_data = pd.DataFrame()
+        self._top_1_2_3 = pd.DataFrame()
+        self._df_dict = {'top_1': pd.DataFrame(), 'top_2': pd.DataFrame(), 'top_3': pd.DataFrame(), 'top_1_2_3': pd.DataFrame()}
+        self.start_analysing()
+
+    def start_analysing(self):
+        print('Start Analysing Power Energy')
+        self.load_dataset()
+        self.data_visualize(part=1)
+        self.data_pre_processing()
+        self.data_visualize(part=2)
+        tsa_m.TimeSeriesAnalysisModel(self._house_hold_names, self._df_dict)
+
+    def load_dataset(self):
+        print('Loading Dataset '+self._dataset)
+        data = pd.read_csv(self._dataset)
+        top_1_house_hold = pd.DataFrame(data['LCLid'].value_counts()).iloc[0].name
+        top_2_house_hold = pd.DataFrame(data['LCLid'].value_counts()).iloc[1].name
+        top_3_house_hold = pd.DataFrame(data['LCLid'].value_counts()).iloc[2].name
+
+        print('Top 3 HouseHolds Are')
+        print('1:: '+top_1_house_hold+' :: '+str(pd.DataFrame(data['LCLid'].value_counts()).iloc[0][0]))
+        print('2:: '+top_2_house_hold+' :: '+str(pd.DataFrame(data['LCLid'].value_counts()).iloc[1][0]))
+        print('3:: '+top_3_house_hold+' :: '+str(pd.DataFrame(data['LCLid'].value_counts()).iloc[2][0]))
+
+        self._house_hold_names = [top_1_house_hold, top_2_house_hold, top_3_house_hold]
+
+        self._top_1_data = data[data.LCLid == top_1_house_hold].reset_index().drop('index', axis=1)
+        self._top_2_data = data[data.LCLid == top_2_house_hold].reset_index().drop('index', axis=1)
+        self._top_3_data = data[data.LCLid == top_3_house_hold].reset_index().drop('index', axis=1)
+
+        self._top_1_2_3 = pd.concat([self._top_1_data, self._top_2_data, self._top_3_data])
+
+        self.update_df_dict()
+
+    def data_visualize(self, part):
+        print('Saving Visualizations')
+        if not os.path.isdir('visualizations'):
+            os.mkdir('visualizations')
+
+        if part == 1:
+            for df in self._df_dict.keys():
+                sns.countplot(x='LCLid', data=self._df_dict[df])
+                plt.savefig('visualizations/'+df+'_LCLid_count_plot.png')
+                plt.clf()
+
+                sns.countplot(x='Acorn', data=self._df_dict[df])
+                plt.savefig('visualizations/'+df+'_Acorn_count_plot.png')
+                plt.clf()
+
+                sns.countplot(x='Acorn_grouped', data=self._df_dict[df])
+                plt.savefig('visualizations/'+df+'_Acorn_grouped_count_plot.png')
+                plt.clf()
+
+        elif part == 2:
+            for df in self._df_dict.keys():
+                self._df_dict[df]['KWh'].plot()
+                plt.savefig('visualizations/'+df+'_data_spread.png')
+                plt.clf()
+
+                autocorrelation_plot(self._df_dict[df]['KWh'])
+                plt.savefig('visualizations/'+df+'_auto_correlation.png')
+                plt.clf()
+
+    def data_pre_processing(self):
+        print('Pre-Processing Dataset')
+        self._top_1_data.isnull().sum()
+        self._top_2_data.isnull().sum()
+        self._top_3_data.isnull().sum()
+        self._top_1_2_3.isnull().sum()
+
+        self._top_1_data['DateTime'] = pd.to_datetime(self._top_1_data['DateTime'])
+        self._top_2_data['DateTime'] = pd.to_datetime(self._top_2_data['DateTime'])
+        self._top_3_data['DateTime'] = pd.to_datetime(self._top_3_data['DateTime'])
+        self._top_1_2_3['DateTime'] = pd.to_datetime(self._top_1_2_3['DateTime'])
+
+        self._top_1_data['Date'] = self._top_1_data['DateTime'].apply(lambda d: d.date())
+        self._top_2_data['Date'] = self._top_2_data['DateTime'].apply(lambda d: d.date())
+        self._top_3_data['Date'] = self._top_3_data['DateTime'].apply(lambda d: d.date())
+        self._top_1_2_3['Date'] = self._top_1_2_3['DateTime'].apply(lambda d: d.date())
+
+        self._top_1_data['Time'] = self._top_1_data['DateTime'].apply(lambda t: t.time())
+        self._top_2_data['Time'] = self._top_2_data['DateTime'].apply(lambda t: t.time())
+        self._top_3_data['Time'] = self._top_3_data['DateTime'].apply(lambda t: t.time())
+        self._top_1_2_3['Time'] = self._top_1_2_3['DateTime'].apply(lambda t: t.time())
+
+        self._top_1_data.set_index('Date', inplace=True)
+        self._top_2_data.set_index('Date', inplace=True)
+        self._top_3_data.set_index('Date', inplace=True)
+        self._top_1_2_3.set_index('Date', inplace=True)
+
+        self.update_df_dict()
+
+    def update_df_dict(self):
+        self._df_dict['top_1'] = self._top_1_data
+        self._df_dict['top_2'] = self._top_2_data
+        self._df_dict['top_3'] = self._top_3_data
+        self._df_dict['top_1_2_3'] = self._top_1_2_3
+
+
+if __name__ == '__main__':
+    dataset_ = 'dataset/Power-Networks-LCL.csv'
+    time_series_analysis_electricity = TimeSeriesAnalysisDataProcess(dataset_)
