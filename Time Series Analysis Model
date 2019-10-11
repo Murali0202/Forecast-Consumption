@@ -1,0 +1,44 @@
+import os
+import pandas as pd
+from sklearn.metrics import mean_squared_error
+from statsmodels.tsa.arima_model import ARIMA, ARIMAResults
+from matplotlib import pyplot as plt
+
+
+class TimeSeriesAnalysisModel:
+    def __init__(self, top_house_hold_names, df_dict):
+        self._top_house_hold_names = top_house_hold_names
+        self._df_dict = df_dict
+        del self._df_dict['top_1_2_3']
+        self.working_model()
+
+    def working_model(self):
+        print('Start Time Series Analysing Using ARIMA Model')
+        if not os.path.isdir('results'):
+            os.mkdir('results')
+        t = 0
+        for household in ['top_1', 'top_2', 'top_3']:
+            print('Analysing '+self._top_house_hold_names[t]+' Household')
+            df = self._df_dict[household].filter(['Date', 'KWh'], axis=1).values
+            train, test = df[0:len(df)-10], df[len(df)-10:len(df)]
+            history = [x for x in train]
+            predicted = []
+            for i in range(len(test)):
+                model = ARIMA(history, order=(5, 1, 0))
+                fitted_model = model.fit(disp=0)
+                pred = fitted_model.forecast()[0]
+                orig = test[i]
+                history.append(orig)
+                predicted.append(pred)
+                print('Predicted: '+str(pred)+'\tExpected: '+str(orig))
+
+            error = mean_squared_error(test, predicted)
+            print(self._top_house_hold_names[t]+' Mean Squared Error: %.3f' % error)
+            print('Saving Plots')
+            plt.plot(test, label='Actual')
+            plt.plot(predicted, color='red', label='predicted')
+            plt.legend()
+            plt.title("Energy usage in kwh for household '"+self._top_house_hold_names[t]+"'", fontsize=14, fontstyle='italic', fontweight='bold')
+            plt.savefig('results/'+household+'_true_vs_pred.png')
+            plt.clf()
+            t += 1
